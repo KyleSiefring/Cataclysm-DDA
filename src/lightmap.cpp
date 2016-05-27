@@ -583,7 +583,7 @@ void cast_zlightB(
         double cumulative_transparency;
     };
 
-    int radius = 40 - offset_distance;
+    int radius = 60 - offset_distance;
 
     constexpr int min_z = -OVERMAP_DEPTH;
     constexpr int max_z = OVERMAP_HEIGHT;
@@ -609,6 +609,10 @@ void cast_zlightB(
             if( start_major >= end_major || start_minor > end_minor ) {
                 continue;
             }
+            slope block_start_major = start_major;
+            slope block_end_major = start_major;
+            state current_state;
+            float last_intensity = 0.0;
             for( delta.z = 0; delta.z <= distance; delta.z++ ) {
                 slope trailing_edge_major( delta.z * 2 - 1, delta.y * 2 + 1 );
                 slope leading_edge_major( delta.z * 2 + 1, delta.y * 2 - 1 );
@@ -625,12 +629,11 @@ void cast_zlightB(
                     slope( delta.z * 2 + 1, delta.y * 2 + 1 ), end_major );
                 bool fill_on_floor_obstruction = recursive_new_end > floor_obstuction_start;
 
-                float last_intensity = 0.0;
                 slope new_start_minor = 1;
 
                 slope row_start_minor = start_minor;
                 bool started_row = false;
-                state current_state;
+                bool split_row = false;
                 const int z_index = current.z + OVERMAP_DEPTH;
                 for( delta.x = 0; delta.x <= distance; delta.x++ ) {
                     current.x = offset.x + delta.x * xx + delta.y * xy + delta.z * xz;
@@ -676,6 +679,9 @@ void cast_zlightB(
                         stack.push_back( { passed_trailing_major, recursive_new_end,
                             row_start_minor, trailing_edge_minor,
                             ((distance - 1) * cumulative_transparency + current_state.transparency) / distance } );
+                        stack.push_back( { block_start_major, block_end_major,
+                            start_minor, end_minor,
+                            ((distance - 1) * cumulative_transparency + current_state.transparency) / distance } );
                     }
                     if( current_state.transparency == LIGHT_TRANSPARENCY_SOLID ) {
                         row_start_minor = new_start_minor;
@@ -684,15 +690,24 @@ void cast_zlightB(
                         row_start_minor = trailing_edge_minor;
                     }
 
+                    split_row = true;
+                    block_start_major = recursive_new_end;
                     current_state = new_state;
                     new_start_minor = leading_edge_minor;
                 }
-                if( check( current_state.transparency, last_intensity ) ) {
+                if( split_row && check( current_state.transparency, last_intensity ) ) {
                     slope passed_trailing_major = std::max( current_state.floor ? floor_obstuction_start : trailing_edge_major, start_major );
                     stack.push_back( { passed_trailing_major, recursive_new_end,
                         row_start_minor, end_minor,
                         ((distance - 1) * cumulative_transparency + current_state.transparency) / distance } );
                 }
+                block_end_major = recursive_new_end;
+            }
+            if( check( current_state.transparency, last_intensity ) )
+            {
+                stack.push_back( { block_start_major, block_end_major,
+                    start_minor, end_minor,
+                    ((distance - 1) * cumulative_transparency + current_state.transparency) / distance } );
             }
         }
         std::swap( stack, last_stack );
