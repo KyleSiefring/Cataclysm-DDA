@@ -548,21 +548,23 @@ inline bool operator==( const ShadowcastingState &lhs, const ShadowcastingState 
 
 #include "debug.h"
 
-// ends_map<(x, slope[end]), (transparency, slope[start])> and
-//  starts_map<(x, slope[start]), (transparency, slope[end], pointer to base line(can be null))>
-// when new start and ends check ends_map with start and starts_map with end
-// new_start = start
-// new_end = end
-// if start in ends_map
-//  new_start = ends_map[start].start
-//  remove ends_map[start]
-// if end in starts_map
-//  new_end = starts_map[end].end
-//  remove starts_map[end]
-// Also check transparency is same for all of these.
-// ends_map[new_end] = new_start
-// starts_map[new_start] = new_end
-// Do we need to check trailing and leading edges?
+// TODO: Recurse once for every distance increment.
+// For every row record all the starts and ends.
+// For every element of every row record information to determine:
+//  If there is a break between this and prev.
+//  Slopes going "up" or for higher z.
+/*eg.
+struct RowSquare {
+    bool connect_prev;
+    slope up;
+};
+
+struct Row {
+    vector<std::pair<slope, slope>> start_and_ends;
+    vector<RowSquare> squares;
+};
+*/
+// When connect_prev is false or at the highest row, look at the row below for slope.
 
 template<int xx, int xy, int xz, int yx, int yy, int yz, int zz,
          float(*calc)(const float &, const float &, const int &),
