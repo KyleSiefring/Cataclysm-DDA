@@ -714,6 +714,15 @@ void cast_zlightB(
                     else {
                         row_start_minor = trailing_edge_minor;
                     }
+                    // if new_state.floor
+                    // delta.x * 2 +- 1, delta.y * 2 - 1
+                    // floor_obstuction_start, trailing_edge_major
+                    if ( new_state.floor && new_state.transparency != LIGHT_TRANSPARENCY_SOLID && !current_state.floor && current_state.transparency != LIGHT_TRANSPARENCY_SOLID ) {
+                        stack.push_back( { std::max( trailing_edge_major, start_major ), std::min( floor_obstuction_start, end_major ),
+                            slope( delta.x * 2 - 1, delta.y * 2 + 1 ), slope( delta.x * 2 - 1, delta.y * 2 - 1 ),
+                            ((distance - 1) * cumulative_transparency + new_state.transparency) / distance,
+                            0 } );
+                    }
                     start_x = delta.x;
 
                     split_row = true;
