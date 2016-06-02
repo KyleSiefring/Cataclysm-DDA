@@ -271,7 +271,7 @@ void shadowcasting_3d_2d( int iterations )
     auto rng = std::bind ( distribution, generator );
 
     float seen_squares_control[MAPSIZE*SEEX][MAPSIZE*SEEY] = {{0}};
-    float seen_squares_experiment[MAPSIZE*SEEX][MAPSIZE*SEEY] = {{0}};
+    float seen_squares_experiment[OVERMAP_LAYERS][MAPSIZE*SEEX][MAPSIZE*SEEY] = {{{0}}};
     float transparency_cache[MAPSIZE*SEEX][MAPSIZE*SEEY] = {{0}};
     bool floor_cache[MAPSIZE*SEEX][MAPSIZE*SEEY] = {{0}};
 
@@ -324,31 +324,31 @@ void shadowcasting_3d_2d( int iterations )
     for( int z = -OVERMAP_DEPTH; z <= OVERMAP_HEIGHT; z++ ) {
         // TODO: Give some more proper values here
         transparency_caches[z + OVERMAP_DEPTH] = &transparency_cache;
-        seen_caches[z + OVERMAP_DEPTH] = &seen_squares_experiment;
+        seen_caches[z + OVERMAP_DEPTH] = &seen_squares_experiment[z + OVERMAP_DEPTH];
         floor_caches[z + OVERMAP_DEPTH] = &floor_cache;
     }
 
     auto start2 = std::chrono::high_resolution_clock::now();
     for( int i = 0; i < iterations; i++ ) {
         // Then the newer algorithm.
-        cast_zlight<0, 1, 0, 1, 0, 0, -1, sight_calc, sight_check>(
+        cast_zlight<0, 1, 1, 0, -1, sight_calc, sight_check>(
             seen_caches, transparency_caches, floor_caches, origin, 0 );
-        cast_zlight<1, 0, 0, 0, 1, 0, -1, sight_calc, sight_check>(
-            seen_caches, transparency_caches, floor_caches, origin, 0 );
-
-        cast_zlight<0, -1, 0, 1, 0, 0, -1, sight_calc, sight_check>(
-            seen_caches, transparency_caches, floor_caches, origin, 0 );
-        cast_zlight<-1, 0, 0, 0, 1, 0, -1, sight_calc, sight_check>(
+        cast_zlight<1, 0, 0, 1, -1, sight_calc, sight_check>(
             seen_caches, transparency_caches, floor_caches, origin, 0 );
 
-        cast_zlight<0, 1, 0, -1, 0, 0, -1, sight_calc, sight_check>(
+        cast_zlight<0, -1, 1, 0, -1, sight_calc, sight_check>(
             seen_caches, transparency_caches, floor_caches, origin, 0 );
-        cast_zlight<1, 0, 0, 0, -1, 0, -1, sight_calc, sight_check>(
+        cast_zlight<-1, 0, 0, 1, -1, sight_calc, sight_check>(
             seen_caches, transparency_caches, floor_caches, origin, 0 );
 
-        cast_zlight<0, -1, 0, -1, 0, 0, -1, sight_calc, sight_check>(
+        cast_zlight<0, 1, -1, 0, -1, sight_calc, sight_check>(
             seen_caches, transparency_caches, floor_caches, origin, 0 );
-        cast_zlight<-1, 0, 0, 0, -1, 0, -1, sight_calc, sight_check>(
+        cast_zlight<1, 0, 0, -1, -1, sight_calc, sight_check>(
+            seen_caches, transparency_caches, floor_caches, origin, 0 );
+
+        cast_zlight<0, -1, -1, 0, -1, sight_calc, sight_check>(
+            seen_caches, transparency_caches, floor_caches, origin, 0 );
+        cast_zlight<-1, 0, 0, -1, -1, sight_calc, sight_check>(
             seen_caches, transparency_caches, floor_caches, origin, 0 );
     }
     auto end2 = std::chrono::high_resolution_clock::now();
@@ -369,7 +369,7 @@ void shadowcasting_3d_2d( int iterations )
         for( int y = 0; y < MAPSIZE*SEEX; ++y ) {
             // Check that both agree on the outcome, but not necessarily the same values.
             if( (seen_squares_control[x][y] > LIGHT_TRANSPARENCY_SOLID) !=
-                (seen_squares_experiment[x][y] > LIGHT_TRANSPARENCY_SOLID) ) {
+                (seen_squares_experiment[OVERMAP_DEPTH][x][y] > LIGHT_TRANSPARENCY_SOLID) ) {
                 passed = false;
                 break;
             }
@@ -382,13 +382,13 @@ void shadowcasting_3d_2d( int iterations )
                 char output = ' ';
                 bool shadowcasting_disagrees =
                     (seen_squares_control[x][y] > LIGHT_TRANSPARENCY_SOLID) !=
-                    (seen_squares_experiment[x][y] > LIGHT_TRANSPARENCY_SOLID);
+                    (seen_squares_experiment[OVERMAP_DEPTH][x][y] > LIGHT_TRANSPARENCY_SOLID);
                 bool bresenham_disagrees =
                     bresenham_visibility_check( offsetX, offsetY, x, y, transparency_cache ) !=
-                    (seen_squares_experiment[x][y] > LIGHT_TRANSPARENCY_SOLID);
+                    (seen_squares_experiment[OVERMAP_DEPTH][x][y] > LIGHT_TRANSPARENCY_SOLID);
 
                 if( shadowcasting_disagrees && bresenham_disagrees ) {
-                    if( seen_squares_experiment[x][y] > LIGHT_TRANSPARENCY_SOLID ) {
+                    if( seen_squares_experiment[OVERMAP_DEPTH][x][y] > LIGHT_TRANSPARENCY_SOLID ) {
                         output = 'R'; // Old shadowcasting and bresenham can't see.
                     } else {
                         output = 'N'; // New shadowcasting can't see.
@@ -400,7 +400,7 @@ void shadowcasting_3d_2d( int iterations )
                         output = 'O'; // Old shadowcasting can't see.
                     }
                 } else if( bresenham_disagrees ){
-                    if( seen_squares_experiment[x][y] > LIGHT_TRANSPARENCY_SOLID ) {
+                    if( seen_squares_experiment[OVERMAP_DEPTH][x][y] > LIGHT_TRANSPARENCY_SOLID ) {
                         output = 'B'; // Bresenham can't see it.
                     } else {
                         output = 'S'; // Shadowcasting can't see it.
@@ -431,7 +431,7 @@ void shadowcasting_3d_2d( int iterations )
                 char output = ' ';
                 if( transparency_cache[x][y] == LIGHT_TRANSPARENCY_SOLID ) {
                     output = '#';
-                } else if( seen_squares_experiment[x][y] > LIGHT_TRANSPARENCY_SOLID ) {
+                } else if( seen_squares_experiment[OVERMAP_DEPTH][x][y] > LIGHT_TRANSPARENCY_SOLID ) {
                     output = 'X';
                 }
                 printf("%c", output);
