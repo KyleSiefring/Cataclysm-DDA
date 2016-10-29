@@ -443,6 +443,60 @@ void shadowcasting_3d_2d( int iterations )
     REQUIRE( passed );
 }
 
+void shadowcasting_random_transparency() {
+    // Construct a rng that produces integers in a range selected to provide the probability
+    // we want, i.e. if we want 1/4 tiles to be set, produce numbers in the range 0-3,
+    // with 0 indicating the bit is set.
+    const unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+    std::default_random_engine generator(seed);
+    std::uniform_real_distribution<double> distribution(0, 1);
+    auto rng = std::bind ( distribution, generator );
+
+    float seen_squares[MAPSIZE*SEEX][MAPSIZE*SEEY] = {{0}};
+    float transparency_cache[MAPSIZE*SEEX][MAPSIZE*SEEY] = {{0}};
+
+    map dummy;
+
+    const int offsetX = 65;
+    const int offsetY = 65;
+
+    // Initialize the transparency value of each square to a random value.
+    for( auto &inner : transparency_cache ) {
+        for( float &square : inner ) {
+	    square = LIGHT_TRANSPARENCY_OPEN_AIR * rng();
+        }
+    }
+
+    for( int i = 7; i < 20; i++ ) {
+	auto start = std::chrono::high_resolution_clock::now();
+        // This is how much view distance should be cut.
+	int cut = 60 - i;
+        castLight<0, 1, 1, 0, sight_calc, sight_check>(
+            seen_squares, transparency_cache, offsetX, offsetY, cut );
+        castLight<1, 0, 0, 1, sight_calc, sight_check>(
+            seen_squares, transparency_cache, offsetX, offsetY, cut );
+
+        castLight<0, -1, 1, 0, sight_calc, sight_check>(
+            seen_squares, transparency_cache, offsetX, offsetY, cut );
+        castLight<-1, 0, 0, 1, sight_calc, sight_check>(
+            seen_squares, transparency_cache, offsetX, offsetY, cut );
+
+        castLight<0, 1, -1, 0, sight_calc, sight_check>(
+            seen_squares, transparency_cache, offsetX, offsetY, cut );
+        castLight<1, 0, 0, -1, sight_calc, sight_check>(
+            seen_squares, transparency_cache, offsetX, offsetY, cut );
+
+        castLight<0, -1, -1, 0, sight_calc, sight_check>(
+            seen_squares, transparency_cache, offsetX, offsetY, cut );
+        castLight<-1, 0, 0, -1, sight_calc, sight_check>(
+            seen_squares, transparency_cache, offsetX, offsetY, cut );
+        auto end = std::chrono::high_resolution_clock::now();
+	long diff = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+        printf( "castLight() executed with a view distance of %d in %ld microseconds.\n",
+                i, diff );
+    }
+}
+
 // Some random edge cases aren't matching.
 TEST_CASE("shadowcasting_runoff", "[.]") {
     shadowcasting_runoff(1);
@@ -463,4 +517,8 @@ TEST_CASE("shadowcasting_3d_2d_performance", "[.]") {
 // I'm not sure this will ever work.
 TEST_CASE("bresenham_vs_shadowcasting", "[.]") {
     shadowcasting_runoff(1, true);
+}
+
+TEST_CASE("shadowcasting_random_transparency_performance", "[.]") {
+    shadowcasting_random_transparency();
 }
